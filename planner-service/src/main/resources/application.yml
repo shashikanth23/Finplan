@@ -1,0 +1,13 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: planner-service
+finplan:
+  jwt:
+    secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes!!}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

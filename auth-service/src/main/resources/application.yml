@@ -1,0 +1,25 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/authdb}
+    username: ${DB_USER:finplan}
+    password: ${DB_PASSWORD:finplan}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+finplan:
+  jwt:
+    # Must be >= 32 bytes. Override with a real secret (K8s Secret) outside local dev.
+    secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes!!}
+    access-token-minutes: 15
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

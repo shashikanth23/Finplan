@@ -1,0 +1,42 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: finance-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/financedb}
+    username: ${DB_USER:finplan}
+    password: ${DB_PASSWORD:finplan}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+finplan:
+  jwt:
+    secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes!!}
+  planner:
+    url: ${PLANNER_URL:http://localhost:8083}
+  outbox:
+    enabled: true
+    poll-ms: 2000
+  dashboard:
+    cache-ttl-seconds: 300
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
