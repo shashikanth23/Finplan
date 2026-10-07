@@ -15,6 +15,13 @@ services:
     volumes: [finance-data:/var/lib/postgresql/data]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U finplan -d financedb"], interval: 5s, retries: 12 }
 
+  notification-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: notificationdb, POSTGRES_USER: finplan, POSTGRES_PASSWORD: finplan }
+    ports: ["5435:5432"]
+    volumes: [notification-data:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U finplan -d notificationdb"], interval: 5s, retries: 12 }
+
   redis:
     image: redis:7
     ports: ["6379:6379"]
@@ -66,7 +73,10 @@ services:
     build: { context: ., dockerfile: notification-service/Dockerfile }
     environment:
       KAFKA_BOOTSTRAP: kafka:19092
-    depends_on: [kafka]
+      DB_URL: jdbc:postgresql://notification-db:5432/notificationdb
+    depends_on:
+      notification-db: { condition: service_healthy }
+      kafka: { condition: service_started }
 
   gateway:
     profiles: [apps]
@@ -90,3 +100,4 @@ services:
 volumes:
   auth-data:
   finance-data:
+  notification-data:

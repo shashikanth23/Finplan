@@ -12,6 +12,7 @@ import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -20,7 +21,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * Relays outbox rows to Kafka in creation order. A row is marked published only after the broker acks it,
  * so a crash between send and mark causes a duplicate, never a loss (at-least-once; consumers dedupe by eventId).
- * With several replicas, use SELECT ... FOR UPDATE SKIP LOCKED so two pods don't publish the same row.
+ * Rows are locked with SELECT ... FOR UPDATE SKIP LOCKED in the publishing transaction, and later events for a
+ * user remain blocked until that user's earlier events are published.
  */
 @Component
 @ConditionalOnProperty(name = "finplan.outbox.enabled", havingValue = "true", matchIfMissing = true)
@@ -37,8 +39,9 @@ public class OutboxPublisher {
     }
 
     @Scheduled(fixedDelayString = "${finplan.outbox.poll-ms:2000}")
+    @Transactional
     public void publishPending() {
-        List<OutboxEvent> batch = outbox.findTop50ByPublishedAtIsNullOrderByCreatedAtAsc();
+        List<OutboxEvent> batch = outbox.lockNextBatch();
         for (OutboxEvent e : batch) {
             try {
                 // Key by user so one user's events stay ordered within a partition.

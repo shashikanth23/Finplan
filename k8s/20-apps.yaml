@@ -137,6 +137,9 @@ spec:
           ports: [{ containerPort: 8084 }]
           env:
             - { name: KAFKA_BOOTSTRAP, valueFrom: { configMapKeyRef: { name: finplan-config, key: KAFKA_BOOTSTRAP } } }
+            - { name: DB_URL, value: "jdbc:postgresql://notification-db:5432/notificationdb" }
+            - { name: DB_USER, valueFrom: { secretKeyRef: { name: finplan-secrets, key: DB_USER } } }
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: finplan-secrets, key: DB_PASSWORD } } }
           resources:
             requests: { cpu: 100m, memory: 384Mi }
             limits: { cpu: "1", memory: 768Mi }
@@ -172,6 +175,7 @@ spec:
             - { name: PLANNER_URL, valueFrom: { configMapKeyRef: { name: finplan-config, key: PLANNER_URL } } }
             - { name: FINANCE_URL, valueFrom: { configMapKeyRef: { name: finplan-config, key: FINANCE_URL } } }
             - { name: CORS_ORIGINS, valueFrom: { configMapKeyRef: { name: finplan-config, key: CORS_ORIGINS } } }
+            - { name: TRUSTED_PROXY_CIDRS, valueFrom: { configMapKeyRef: { name: finplan-config, key: TRUSTED_PROXY_CIDRS } } }
           resources:
             requests: { cpu: 100m, memory: 384Mi }
             limits: { cpu: "1", memory: 768Mi }

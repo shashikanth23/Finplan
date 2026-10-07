@@ -38,8 +38,12 @@ spring:
           predicates:
             - Path=/api/profile/**,/api/incomes/**,/api/expenses/**,/api/debts/**,/api/goals/**,/api/dashboard/**
 finplan:
+  gateway:
+    trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
   jwt:
+    mode: ${JWT_MODE:HS256}
     secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes!!}
+    public-key: ${JWT_PUBLIC_KEY:}
 management:
   endpoints:
     web:

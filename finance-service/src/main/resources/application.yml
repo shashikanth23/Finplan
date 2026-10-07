@@ -27,7 +27,9 @@ spring:
         enable.idempotence: true
 finplan:
   jwt:
+    mode: ${JWT_MODE:HS256}
     secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes!!}
+    public-key: ${JWT_PUBLIC_KEY:}
   planner:
     url: ${PLANNER_URL:http://localhost:8083}
   outbox:

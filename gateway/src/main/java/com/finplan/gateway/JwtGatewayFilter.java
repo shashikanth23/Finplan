@@ -1,8 +1,7 @@
 package com.finplan.gateway;
 
+import com.finplan.security.JwtTokens;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -14,9 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-
 /**
  * Rejects unauthenticated calls at the edge so bad traffic never reaches the services.
  * Services still validate the token themselves (defence in depth), because the gateway is not the only way in
@@ -25,10 +21,18 @@ import java.nio.charset.StandardCharsets;
 @Component
 public class JwtGatewayFilter implements GlobalFilter, Ordered {
 
-    private final SecretKey key;
+    private final String mode;
+    private final String secret;
+    private final String publicKey;
 
-    public JwtGatewayFilter(@Value("${finplan.jwt.secret}") String secret) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    public JwtGatewayFilter(@Value("${finplan.jwt.mode:HS256}") String mode,
+                            @Value("${finplan.jwt.secret:}") String secret,
+                            @Value("${finplan.jwt.public-key:}") String publicKey,
+                            @Value("${spring.profiles.active:}") String activeProfiles) {
+        JwtTokens.validateVerificationConfiguration(mode, secret, publicKey, activeProfiles);
+        this.mode = mode;
+        this.secret = secret;
+        this.publicKey = publicKey;
     }
 
     @Override
@@ -40,7 +44,7 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
         String header = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (header == null || !header.startsWith("Bearer ")) return reject(exchange);
         try {
-            Jwts.parser().verifyWith(key).build().parseSignedClaims(header.substring(7));
+            JwtTokens.verify(header.substring(7), mode, secret, publicKey);
         } catch (JwtException | IllegalArgumentException e) {
             return reject(exchange);
         }

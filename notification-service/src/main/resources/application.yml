@@ -3,6 +3,12 @@ server:
 spring:
   application:
     name: notification-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5435/notificationdb}
+    username: ${DB_USER:finplan}
+    password: ${DB_PASSWORD:finplan}
+  flyway:
+    enabled: true
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
     consumer:

@@ -15,8 +15,11 @@ spring:
     enabled: true
 finplan:
   jwt:
+    mode: ${JWT_MODE:HS256}
     # Must be >= 32 bytes. Override with a real secret (K8s Secret) outside local dev.
     secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes!!}
+    private-key: ${JWT_PRIVATE_KEY:}
+    public-key: ${JWT_PUBLIC_KEY:}
     access-token-minutes: 15
 management:
   endpoints:

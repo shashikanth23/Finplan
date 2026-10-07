@@ -21,6 +21,7 @@
   </properties>
   <modules>
     <module>engine</module>
+    <module>security</module>
     <module>auth-service</module>
     <module>planner-service</module>
     <module>finance-service</module>

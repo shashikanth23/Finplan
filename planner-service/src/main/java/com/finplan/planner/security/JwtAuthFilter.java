@@ -1,9 +1,7 @@
 package com.finplan.planner.security;
 
-import io.jsonwebtoken.Claims;
+import com.finplan.security.JwtTokens;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,18 +11,21 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import javax.crypto.SecretKey;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /** Validates the bearer token issued by auth-service, locally, with no call back to it. */
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final SecretKey key;
+    private final String mode;
+    private final String secret;
+    private final String publicKey;
 
-    public JwtAuthFilter(String secret) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    public JwtAuthFilter(String mode, String secret, String publicKey, String activeProfiles) {
+        JwtTokens.validateVerificationConfiguration(mode, secret, publicKey, activeProfiles);
+        this.mode = mode;
+        this.secret = secret;
+        this.publicKey = publicKey;
     }
 
     @Override
@@ -33,7 +34,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String header = req.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             try {
-                Claims c = Jwts.parser().verifyWith(key).build().parseSignedClaims(header.substring(7)).getPayload();
+                var c = JwtTokens.verify(header.substring(7), mode, secret, publicKey);
                 var auth = new UsernamePasswordAuthenticationToken(c.getSubject(), null,
                         List.of(new SimpleGrantedAuthority("ROLE_" + c.get("role", String.class))));
                 SecurityContextHolder.getContext().setAuthentication(auth);

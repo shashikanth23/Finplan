@@ -55,14 +55,14 @@ Replace the placeholder secret first.
 ## What was verified, and what was not
 
 Run for real while building:
-- The `engine` module compiled and its logic was exercised: 27 JUnit-style tests across tax, salary, EMI, planner,
-  categoriser and goal maths all pass, plus a brute-force check that `requiredGross` returns the true minimum salary.
+- 36 targeted tests pass across the engine, shared JWT security, auth, notification and gateway modules.
 - The frontend passes `tsc --noEmit` and `vite build`.
-- All YAML (compose, Kubernetes, CI) parses.
 
-NOT run: the Spring Boot services (no Maven or Maven Central access where this was written). They have never been
-compiled or started, so expect to fix some compile errors or typos on first `mvn verify`. The Testcontainers test, the
-Kafka/Redis wiring and the Kubernetes manifests are untested against real infrastructure.
+NOT verified here:
+- This environment has Java 27, while the project targets Java 21; the finance-service's existing Lombok processor
+  is incompatible with Java 27, so its tests and a full `mvn verify` must be run with Java 21 (as configured in CI).
+- Testcontainers against PostgreSQL, Kafka/Redis wiring, and Kubernetes manifests have not been exercised against
+  live infrastructure.
 
 ## API (via gateway, all except register/login need `Authorization: Bearer <token>`)
 
@@ -97,17 +97,24 @@ Kafka/Redis wiring and the Kubernetes manifests are untested against real infras
   this avoids the dual-write problem. Delivery is at-least-once; the consumer dedupes by `eventId`.
 - **Ordering.** Events are keyed by user id, so one user's events stay ordered within a partition.
 - **Security.** BCrypt, stateless JWT, owner-scoped queries (another user's id returns 404, same as missing),
-  identical login error for unknown email and wrong password, JWT checked at the gateway and again in each service.
+  identical login error for unknown email and wrong password. Local development uses HS256; production profile
+  requires RS256, with the private signing key in auth-service and only the public verification key in other services.
+- **Rate limiting.** The gateway trusts `X-Forwarded-For` only when the immediate network peer matches
+  `TRUSTED_PROXY_CIDRS`; configure this with the ingress controller's actual pod CIDR. With no trusted proxy CIDR,
+  the gateway safely rate-limits by its direct peer instead of trusting caller-supplied headers.
 - **Database per service**, Flyway owns the schema, Hibernate only validates.
 
 ## Known limitations
 
 - Tax: FY 2026-27 slabs for residents under 60. No surcharge, HRA/LTA, senior-citizen slabs, or capital gains.
   Slabs are plain arrays in `TaxCalculator` for easy updates. Verify against the current Finance Act before relying on it.
-- Auth: HS256 with a shared secret, no refresh tokens (users sign in again after 15 minutes), token kept in
-  localStorage. Better: RS256 so only auth-service holds the signing key, plus refresh tokens in an httpOnly cookie.
-- Outbox publisher needs `FOR UPDATE SKIP LOCKED` before running more than one finance-service replica.
-- Dedupe in notification-service is in memory; use Redis or a table with several replicas.
+- Auth: no refresh tokens (users sign in again after 15 minutes), token kept in localStorage. Production RS256 keys
+  are base64-encoded DER: PKCS#8 private key as `JWT_PRIVATE_KEY` in auth-service and X.509 public key as
+  `JWT_PUBLIC_KEY` in gateway, planner-service and finance-service. The `prod` Spring profile rejects HS256.
+- Outbox publisher claims rows with `FOR UPDATE SKIP LOCKED` and preserves per-user order across finance replicas.
+- Notification event IDs are stored in the notification service's own Postgres database, so deduplication survives
+  restarts and multiple replicas. When replacing the current log delivery with an external provider, pass the event ID
+  as the provider's idempotency key to cover the narrow case where delivery succeeds but the DB commit fails.
 - Bank/transaction integration is not built. It needs a regulated provider (in India, the Account Aggregator
   framework) and consent flows. The keyword categoriser (`/api/planner/categorize`) is the part that exists.
 - No refresh of loan balances over time; remaining balance is entered by the user.

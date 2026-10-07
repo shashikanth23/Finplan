@@ -14,13 +14,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, @Value("${finplan.jwt.secret}") String secret) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http,
+                                    @Value("${finplan.jwt.mode:HS256}") String mode,
+                                    @Value("${finplan.jwt.secret:}") String secret,
+                                    @Value("${finplan.jwt.public-key:}") String publicKey,
+                                    @Value("${spring.profiles.active:}") String activeProfiles) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated())
-            .addFilterBefore(new JwtAuthFilter(secret), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtAuthFilter(mode, secret, publicKey, activeProfiles), UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
         return http.build();
     }

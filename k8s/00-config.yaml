@@ -12,6 +12,7 @@ data:
   AUTH_URL: http://auth-service:8081
   FINANCE_URL: http://finance-service:8082
   CORS_ORIGINS: http://finplan.local
+  TRUSTED_PROXY_CIDRS: ""
 ---
 # Placeholder values for local clusters only. In a real cluster create this from your secret manager
 # (External Secrets, Sealed Secrets, Vault); never commit real values.

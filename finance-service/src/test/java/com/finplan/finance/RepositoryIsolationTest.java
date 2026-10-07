@@ -4,6 +4,8 @@ import com.finplan.finance.domain.Enums.Frequency;
 import com.finplan.finance.domain.Enums.IncomeType;
 import com.finplan.finance.domain.Income;
 import com.finplan.finance.domain.Repositories.IncomeRepository;
+import com.finplan.finance.domain.OutboxEvent;
+import com.finplan.finance.domain.Repositories.OutboxRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -14,6 +16,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,6 +35,7 @@ class RepositoryIsolationTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
 
     @Autowired IncomeRepository incomes;
+    @Autowired OutboxRepository outbox;
 
     private Income income(UUID user, String label, String amount, Frequency f) {
         Income i = new Income();
@@ -63,5 +67,29 @@ class RepositoryIsolationTest {
     @Test
     void databaseRejectsNegativeAmounts() {
         assertThrows(Exception.class, () -> income(UUID.randomUUID(), "Bad", "-1", Frequency.MONTHLY));
+    }
+
+    @Test
+    void outboxBatchKeepsEachUsersEventsInOrder() {
+        UUID userId = UUID.randomUUID();
+        OutboxEvent first = event(userId, Instant.parse("2026-01-01T00:00:00Z"));
+        OutboxEvent second = event(userId, Instant.parse("2026-01-02T00:00:00Z"));
+        outbox.saveAndFlush(first);
+        outbox.saveAndFlush(second);
+
+        assertEquals(java.util.List.of(first.getId()), outbox.lockNextBatch().stream().map(OutboxEvent::getId).toList());
+        outbox.markPublished(first.getId(), Instant.now());
+        assertEquals(java.util.List.of(second.getId()), outbox.lockNextBatch().stream().map(OutboxEvent::getId).toList());
+    }
+
+    private OutboxEvent event(UUID userId, Instant createdAt) {
+        OutboxEvent event = new OutboxEvent();
+        event.setAggregateType("INCOME");
+        event.setAggregateId(UUID.randomUUID());
+        event.setEventType("INCOME_CHANGED");
+        event.setUserId(userId);
+        event.setPayload("{}");
+        event.setCreatedAt(createdAt);
+        return event;
     }
 }

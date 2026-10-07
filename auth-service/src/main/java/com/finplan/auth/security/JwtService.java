@@ -1,44 +1,57 @@
 package com.finplan.auth.security;
 
 import com.finplan.auth.user.User;
+import com.finplan.security.JwtTokens;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
+import java.util.Map;
 
 @Service
 public class JwtService {
 
-    private final SecretKey key;
+    private final String mode;
+    private final String secret;
+    private final String privateKey;
+    private final String publicKey;
     private final Duration accessTtl;
 
-    public JwtService(@Value("${finplan.jwt.secret}") String secret,
+    @Autowired
+    public JwtService(@Value("${finplan.jwt.mode:HS256}") String mode,
+                      @Value("${finplan.jwt.secret:}") String secret,
+                      @Value("${finplan.jwt.private-key:}") String privateKey,
+                      @Value("${finplan.jwt.public-key:}") String publicKey,
+                      @Value("${spring.profiles.active:}") String activeProfiles,
                       @Value("${finplan.jwt.access-token-minutes}") long accessMinutes) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        JwtTokens.validateSigningConfiguration(mode, secret, privateKey, activeProfiles);
+        if ("RS256".equalsIgnoreCase(mode)) {
+            JwtTokens.validateVerificationConfiguration(mode, secret, publicKey, activeProfiles);
+            JwtTokens.validateKeyPair(mode, privateKey, publicKey);
+        }
+        this.mode = mode;
+        this.secret = secret;
+        this.privateKey = privateKey;
+        this.publicKey = publicKey;
         this.accessTtl = Duration.ofMinutes(accessMinutes);
+    }
+
+    public JwtService(String secret, long accessMinutes) {
+        this("HS256", secret, "", "", "", accessMinutes);
     }
 
     public String generateAccessToken(User user) {
         Instant now = Instant.now();
-        return Jwts.builder()
-                .subject(user.getId().toString())
-                .claim("email", user.getEmail())
-                .claim("role", user.getRole().name())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(accessTtl)))
-                .signWith(key)
-                .compact();
+        return JwtTokens.sign(user.getId().toString(),
+                Map.of("email", user.getEmail(), "role", user.getRole().name()),
+                now, now.plus(accessTtl), mode, secret, privateKey);
     }
 
     public Claims parse(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        return JwtTokens.verify(token, mode, secret, publicKey);
     }
 
     public long accessTtlSeconds() {

@@ -38,7 +38,22 @@ public final class Repositories {
     }
 
     public interface OutboxRepository extends JpaRepository<OutboxEvent, UUID> {
-        List<OutboxEvent> findTop50ByPublishedAtIsNullOrderByCreatedAtAsc();
+        @Query(value = """
+                select event.*
+                from outbox_events event
+                where event.published_at is null
+                  and not exists (
+                    select 1
+                    from outbox_events earlier
+                    where earlier.user_id = event.user_id
+                      and earlier.published_at is null
+                      and (earlier.created_at, earlier.id) < (event.created_at, event.id)
+                  )
+                order by event.created_at, event.id
+                limit 50
+                for update skip locked
+                """, nativeQuery = true)
+        List<OutboxEvent> lockNextBatch();
 
         @Modifying
         @Transactional
